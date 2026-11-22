@@ -328,7 +328,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fields[m.focus], cmd = m.fields[m.focus].Update(msg)
 			return m, cmd
 		case "confirm":
-			if v.String() == "y" {
+			if v.String() == "enter" {
 				m.busy = true
 				return m, m.action("send")
 			}
@@ -397,7 +397,7 @@ func (m model) View() string {
 			body += "\nChanging environment also requires its matching username and key.\nBlank API key keeps the stored key; AT_* variables take precedence."
 		}
 	case "confirm":
-		body = fmt.Sprintf("CONFIRM %s PURCHASE\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\nAccount: %s\n\nPress y to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", strings.ToUpper(m.env), m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount), m.preview.Account)
+		body = fmt.Sprintf("CONFIRM %s PURCHASE\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\nAccount: %s\n\nPress Enter to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", strings.ToUpper(m.env), m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount), m.preview.Account)
 	case "history":
 		body += "Locally recorded purchases\n" + m.table.View() + "\n↑↓ Select  Enter Details  Esc Back"
 	case "result":

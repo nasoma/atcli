@@ -20,9 +20,32 @@ func TestPurchaseNeedsConfirmation(t *testing.T) {
 	if m.screen != "confirm" || c != nil {
 		t.Fatal("purchase before confirmation")
 	}
-	m.busy = true
-	_, c = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	// The form Enter only opens confirmation; another explicit Enter submits.
+	v, c = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = v.(model)
+	if c == nil || !m.busy {
+		t.Fatal("Enter did not submit from confirmation")
+	}
+	_, c = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if c != nil {
 		t.Fatal("duplicate command while busy")
+	}
+}
+
+func TestConfirmationEditAndCancel(t *testing.T) {
+	for _, tc := range []struct {
+		key    tea.KeyMsg
+		screen string
+	}{
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}, "send"},
+		{tea.KeyMsg{Type: tea.KeyEsc}, "dashboard"},
+		{tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}, "confirm"},
+	} {
+		m := model{cfg: config.Default(), env: "production", screen: "confirm"}
+		v, c := m.Update(tc.key)
+		got := v.(model)
+		if c != nil || got.busy || got.screen != tc.screen {
+			t.Fatalf("unexpected confirmation action: %s", got.screen)
+		}
 	}
 }
