@@ -38,6 +38,7 @@ type model struct {
 	spin                           spinner.Model
 	busy                           bool
 	notice                         string
+	noticeError                    bool
 	preview                        storage.Record
 	rows                           []storage.Record
 	table                          table.Model
@@ -71,6 +72,7 @@ func run(env string, setup bool) error {
 	defer st.DB.Close()
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
+	sp.Style = lipgloss.NewStyle().Foreground(teal)
 	m := model{cfg: c, env: env, store: st, screen: "dashboard", width: 80, height: 24, spin: sp, first: !config.Exists() || c.Profiles[env].Username == ""}
 	if setup || m.first {
 		m.settings()
@@ -84,6 +86,7 @@ func (m *model) form(screen string, labels, values []string) {
 	m.fields = nil
 	m.focus = 0
 	m.notice = ""
+	m.noticeError = false
 	for i, label := range labels {
 		f := textinput.New()
 		f.Placeholder = ""
@@ -98,6 +101,8 @@ func (m *model) form(screen string, labels, values []string) {
 			f.Placeholder = "ATQid_…"
 		}
 		f.Prompt = label + ": "
+		f.PromptStyle = headingStyle
+		f.Cursor.Style = lipgloss.NewStyle().Foreground(teal)
 		f.CharLimit = 200
 		f.Width = 32
 		if i < len(values) {
@@ -206,6 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case result:
 		m.busy = false
+		m.noticeError = v.err != nil
 		if v.err != nil {
 			m.notice = v.err.Error()
 		} else {
@@ -237,6 +243,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				rows = append(rows, table.Row{date, r.Recipient, r.Currency + " " + money.Format(r.Amount), r.Status, r.Environment})
 			}
 			m.table = table.New(table.WithColumns([]table.Column{{Title: "Local date", Width: 11}, {Title: "Recipient", Width: 14}, {Title: "Amount", Width: 12}, {Title: "Status", Width: 9}, {Title: "Env", Width: 10}}), table.WithRows(rows), table.WithHeight(max(1, min(12, m.height-10))), table.WithFocused(true), table.WithWidth(max(1, m.width-8)))
+			styles := table.DefaultStyles()
+			styles.Header = styles.Header.Foreground(teal).Bold(true)
+			styles.Selected = styles.Selected.Foreground(teal).Background(lipgloss.AdaptiveColor{Light: "254", Dark: "236"}).Bold(true)
+			m.table.SetStyles(styles)
 			m.screen = "history"
 		}
 		return m, nil
@@ -256,6 +266,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.String() == "esc" {
 			m.screen = "dashboard"
 			m.notice = ""
+			m.noticeError = false
 			m.fields = nil
 			return m, nil
 		}
@@ -270,6 +281,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = (m.selected + 1) % len(menu)
 			case "enter":
 				m.notice = ""
+				m.noticeError = false
 				switch m.selected {
 				case 0:
 					m.form("send", []string{"Recipient", "Amount", "Currency"}, []string{"", "", m.cfg.Currency})
@@ -311,6 +323,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					r, e := s.Preview(m.fields[0].Value(), m.fields[1].Value(), m.fields[2].Value())
 					if e != nil {
 						m.notice = e.Error()
+						m.noticeError = true
 					} else {
 						m.preview = r
 						m.screen = "confirm"
@@ -338,6 +351,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "history":
 			if v.String() == "enter" && len(m.rows) > 0 {
 				m.notice = recordText(m.rows[m.table.Cursor()])
+				m.noticeError = false
 				m.screen = "result"
 				return m, nil
 			}
@@ -352,6 +366,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if v.String() == "q" || v.String() == "enter" {
 				m.screen = "dashboard"
 				m.notice = ""
+				m.noticeError = false
 			}
 		}
 	}
@@ -369,11 +384,7 @@ func (m model) View() string {
 	if m.width > 0 && (m.width < 45 || m.height < 15) {
 		return "ATCLI — enlarge terminal to at least 45×15.\n80×24 recommended. q / Ctrl+C quits.\n"
 	}
-	accent := lipgloss.Color("42")
-	if m.env == "production" {
-		accent = lipgloss.Color("196")
-	}
-	title := lipgloss.NewStyle().Bold(true).Foreground(accent).Render("ATCLI — Africa's Talking  •  " + strings.ToUpper(m.env))
+	title := headingStyle.Render("ATCLI — Africa's Talking") + "  •  " + environmentLabel(m.env)
 	body := "Account: " + m.username() + "\n\n"
 	switch m.screen {
 	case "dashboard":
@@ -382,7 +393,11 @@ func (m model) View() string {
 			if i == m.selected {
 				prefix = "› "
 			}
-			body += prefix + item + "\n"
+			line := prefix + item
+			if i == m.selected {
+				line = headingStyle.Render(line)
+			}
+			body += line + "\n"
 		}
 		body += "\n↑↓ Navigate  Enter Select  q Quit"
 	case "send", "settings", "status":
@@ -397,7 +412,7 @@ func (m model) View() string {
 			body += "\nChanging environment also requires its matching username and key.\nBlank API key keeps the stored key; AT_* variables take precedence."
 		}
 	case "confirm":
-		body = fmt.Sprintf("CONFIRM %s PURCHASE\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\nAccount: %s\n\nPress Enter to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", strings.ToUpper(m.env), m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount), m.preview.Account)
+		body = warningStyle.Render("CONFIRM "+strings.ToUpper(m.env)+" PURCHASE") + fmt.Sprintf("\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\nAccount: %s\n\nPress Enter to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount), m.preview.Account)
 	case "history":
 		body += "Locally recorded purchases\n" + m.table.View() + "\n↑↓ Select  Enter Details  Esc Back"
 	case "result":
@@ -407,13 +422,17 @@ func (m model) View() string {
 		body += "\n" + m.spin.View() + " Working… purchase controls locked."
 	}
 	if m.notice != "" {
-		body += "\n\n" + m.notice
+		notice := m.notice
+		if m.noticeError {
+			notice = errorStyle.Render(notice)
+		}
+		body += "\n\n" + notice
 	}
 	if m.screen != "dashboard" {
 		body += "\n\nEsc Back  Ctrl+C Quit"
 	}
 	w := max(12, min(86, m.width-4))
-	return lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder()).BorderForeground(accent).Padding(0, 1).Render(title+"\n\n"+body) + "\n"
+	return lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder()).BorderForeground(teal).Padding(0, 1).Render(title+"\n\n"+body) + "\n"
 }
 
 func (m model) username() string {

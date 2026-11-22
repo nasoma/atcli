@@ -131,7 +131,8 @@ purchases, inspect the JSON submission and status fields even on a nonzero exit.
 Dashboard: arrows or j/k to navigate, Enter to select, q to quit.
 Forms: Tab/arrows change field, Enter validates/continues; Escape returns.
 Purchase confirmation: Enter submits exactly once, n edits, Escape cancels.
-Production is marked in red. Network requests run asynchronously with a spinner;
+Teal highlights navigation and headings; an amber badge marks production, amber
+highlights purchase confirmation, and red is reserved for errors. Network requests run asynchronously with a spinner;
 purchase controls are locked while pending. Ctrl+C exits at any time, leaving the
 durable intent available for reconciliation if a request was interrupted.
 History: arrows select, Enter shows full details. Settings: Enter securely saves
