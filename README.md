@@ -94,8 +94,8 @@ country-code and international formats are accepted, including 01 mobile ranges.
 No carrier is inferred because numbers are portable.
 
 Supported destination/currency pairs currently are Kenya/KES, Uganda/UGX,
-Tanzania/TZS and Nigeria/NGN. Other markets are deliberately refused until their
-limits are verified. Provider-published bounds are enforced in addition to the
+Tanzania/TZS and Nigeria/NGN. Other destinations are not supported.
+Provider-published bounds are enforced in addition to the
 personal maximum (default 1000 in the selected currency). Account restrictions and
 operator denominations can still cause rejection. Cross-country purchases need a
 suitably provisioned app; Africa's Talking documents USD-base apps for cross-border
@@ -114,8 +114,8 @@ purchases, inspect the JSON submission and status fields even on a nonzero exit.
 
 ```text
 ╭─────────────────────────────────────────────────────────────╮
-│ ATCLI — Africa's Talking  •  PRODUCTION                         │
-│ Account: your-app                                            │
+│ ATCLI — Africa's Talking  •  PRODUCTION                     │
+│ Account: your-app                                           │
 │                                                             │
 │ › Send Airtime                                              │
 │   Check Balance                                             │
@@ -124,7 +124,7 @@ purchases, inspect the JSON submission and status fields even on a nonzero exit.
 │   Settings                                                  │
 │   Exit                                                      │
 │                                                             │
-│ ↑↓ Navigate  Enter Select  q Quit                            │
+│ ↑↓ Navigate  Enter Select  q Quit                           │
 ╰─────────────────────────────────────────────────────────────╯
 ```
 
@@ -137,7 +137,7 @@ durable intent available for reconciliation if a request was interrupted.
 History: arrows select, Enter shows full details. Settings: Enter securely saves
 and tests using a non-monetary balance operation. To update the key, enter a new
 one; blank retains the saved key. Settings are never saved implicitly on exit.
-Select Check Balance to retrieve real data; no example balance is displayed as live.
+Select Check Balance to retrieve your current account balance.
 A terminal of at least 80×24 is recommended for tables and setup; resize events
 update the form width and table height.
 
@@ -156,8 +156,8 @@ for two minutes. Known failures may be retried by a new explicit purchase.
 lookup maps to delivered. Unexpected responses, timeouts, process interruption and
 missing IDs remain unknown. Do not repeat them: check the recorded provider ID
 with `airtime status`, or reconcile in the provider dashboard if no ID was saved.
-There is intentionally no command that casually clears an unknown intent. If the
-provider cannot resolve it, contact support before considering another purchase.
+Unresolved purchases remain in history until their status can be confirmed. If the
+provider cannot resolve a purchase, contact support before sending it again.
 Local deduplication and provider idempotency cannot guarantee exactly-once delivery
 across lost databases, devices, or undocumented provider retention windows.
 
@@ -165,12 +165,11 @@ History is local only, scoped by selected environment and labelled by account.
 It does not import every transaction performed through the Africa's Talking dashboard.
 Status lookup accepts local operation IDs or provider ATQid identifiers. A provider
 ID absent from local history can be checked directly; recipient and amount are
-then unavailable, and no invented purchase record is added to history.
+then unavailable, and the lookup does not add a purchase to local history.
 
-## API verification and limitations
+## API reference
 
-The provider's developer site returned HTTP 403 during implementation. Contracts
-were checked against its official SDK source and official Postman collection:
+Africa's Talking API endpoints and account restrictions:
 
 - [Application SDK](https://github.com/AfricasTalkingLtd/africastalking-python/blob/master/africastalking/Application.py): GET `/version1/user?username=...`, `UserData.balance`.
 - [Airtime SDK](https://github.com/AfricasTalkingLtd/africastalking-python/blob/master/africastalking/Airtime.py): POST `/version1/airtime/send`, URL-encoded username and JSON recipients, `Idempotency-Key`, `maxNumRetry`.
@@ -182,10 +181,10 @@ Hosts are fixed to `https://api.africastalking.com` and
 `https://api.sandbox.africastalking.com`. Requests send `apiKey` and
 `Accept: application/json`, validate TLS, time out after 20 seconds and cap responses
 at 1 MiB. There is no user-configurable endpoint that could receive your key.
-No callback server is included; final status is checked explicitly. Sandbox
-simulates airtime; it does not deliver real airtime. Exact sandbox status progression,
-operator availability, current limits and live authentication still require testing
-with your account. No live monetary request is made by tests.
+Check final delivery status with `atcli airtime status`; ATCLI does not receive
+callbacks. Sandbox simulates purchases without delivering real airtime. Production
+requires valid credentials, sufficient balance and an account provisioned for the
+recipient's market. Operator availability and account restrictions may affect delivery.
 
 ## Troubleshooting
 
@@ -210,11 +209,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dist/atcli-darwin-arm64 .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/atcli-linux-amd64 .
 ```
 
-Cobra commands and the Bubble Tea UI share `internal/service`. `internal/storage`
-uses pure-Go SQLite without an ORM; schema initialization is migration version 1.
-API tests use httptest, safety tests use isolated temporary SQLite databases and
-fake provider calls, and TUI transitions are testable without a terminal.
-CI runs on Linux and macOS; version tags build CGO-free macOS/Linux arm64/amd64
-archives with checksums and publish a GitHub release.
+Version tags publish macOS and Linux archives for arm64 and amd64, with checksums,
+through GitHub Releases.
 
 MIT licensed. See LICENSE.
