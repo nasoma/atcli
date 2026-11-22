@@ -1,0 +1,5 @@
+/atcli
+/dist/
+*.sqlite*
+.env
+.DS_Store
