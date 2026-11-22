@@ -13,6 +13,14 @@ Install from the public `github.com/nasoma/atcli` repository:
 go install github.com/nasoma/atcli@latest
 ```
 
+To install this release explicitly:
+
+```sh
+go install github.com/nasoma/atcli@v0.1.0
+```
+
+Run `atcli --version` to check the installed version.
+
 Or clone and build locally:
 
 ```sh

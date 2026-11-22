@@ -16,11 +16,22 @@ import (
 	"golang.org/x/term"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"text/tabwriter"
 )
 
 var Version = "dev"
+
+func buildVersion() string {
+	if Version != "dev" {
+		return Version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return Version
+}
 
 func Interactive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -69,7 +80,7 @@ func output(v any) error { return json.NewEncoder(os.Stdout).Encode(v) }
 func Root() *cobra.Command {
 	var env string
 	var jsonMode bool
-	root := &cobra.Command{Use: "atcli", Short: "Africa's Talking airtime manager", Version: Version, SilenceUsage: true, SilenceErrors: true}
+	root := &cobra.Command{Use: "atcli", Short: "Africa's Talking airtime manager", Version: buildVersion(), SilenceUsage: true, SilenceErrors: true}
 	root.PersistentFlags().StringVar(&env, "env", "", "sandbox or production (defaults to config)")
 	root.PersistentFlags().BoolVar(&jsonMode, "json", false, "machine-readable output; purchases also require --yes")
 	launch := func(cmd *cobra.Command, args []string) error {
@@ -91,7 +102,7 @@ func Root() *cobra.Command {
 		}
 		return tui.Run(env)
 	}})
-	root.AddCommand(&cobra.Command{Use: "version", Short: "Print the build version", Args: cobra.NoArgs, Run: func(cmd *cobra.Command, args []string) { fmt.Fprintln(cmd.OutOrStdout(), Version) }})
+	root.AddCommand(&cobra.Command{Use: "version", Short: "Print the build version", Args: cobra.NoArgs, Run: func(cmd *cobra.Command, args []string) { fmt.Fprintln(cmd.OutOrStdout(), buildVersion()) }})
 	root.AddCommand(&cobra.Command{Use: "balance", Short: "Retrieve the application balance without spending", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		s, e := Open(env, true)
 		if e != nil {
