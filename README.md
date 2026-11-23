@@ -122,8 +122,7 @@ purchases, inspect the JSON submission and status fields even on a nonzero exit.
 
 ```text
 ╭─────────────────────────────────────────────────────────────╮
-│ ATCLI — Africa's Talking  •  PRODUCTION                     │
-│ Account: your-app                                           │
+│ ATCLI — Africa's Talking                                    │
 │                                                             │
 │ › Send Airtime                                              │
 │   Check Balance                                             │
@@ -139,7 +138,7 @@ purchases, inspect the JSON submission and status fields even on a nonzero exit.
 Dashboard: arrows or j/k to navigate, Enter to select, q to quit.
 Forms: Tab/arrows change field, Enter validates/continues; Escape returns.
 Purchase confirmation: Enter submits exactly once, n edits, Escape cancels.
-Teal highlights navigation and headings; an amber badge marks production, amber
+Teal highlights navigation and headings; amber
 highlights purchase confirmation, and red is reserved for errors. Network requests run asynchronously with a spinner;
 purchase controls are locked while pending. Ctrl+C exits at any time, leaving the
 durable intent available for reconciliation if a request was interrupted.
@@ -147,6 +146,10 @@ History: arrows select, Enter shows full details. Settings: Enter securely saves
 and tests using a non-monetary balance operation. To update the key, enter a new
 one; blank retains the saved key. Settings are never saved implicitly on exit.
 Select Check Balance to retrieve your current account balance.
+After sending, the TUI automatically checks delivery once. Confirmed delivery shows
+Success; accepted submissions show Sent while delivery is unconfirmed. Queued
+requests remain Pending. Use Transaction Status to check again later. Environment
+and username are configured in Settings; sandbox mode retains a SANDBOX indicator.
 A terminal of at least 80×24 is recommended for tables and setup; resize events
 update the form width and table height.
 
@@ -170,7 +173,7 @@ provider cannot resolve a purchase, contact support before sending it again.
 Local deduplication and provider idempotency cannot guarantee exactly-once delivery
 across lost databases, devices, or undocumented provider retention windows.
 
-History is local only, scoped by selected environment and labelled by account.
+History is local only and scoped by selected environment.
 It does not import every transaction performed through the Africa's Talking dashboard.
 Status lookup accepts local operation IDs or provider ATQid identifiers. A provider
 ID absent from local history can be checked directly; recipient and amount are

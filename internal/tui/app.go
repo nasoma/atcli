@@ -143,6 +143,11 @@ func (m model) action(kind string) tea.Cmd {
 			return result{text: "Account balance: " + b.Currency + " " + b.Amount, err: e}
 		case "send":
 			r, e := s.Send(ctx, m.preview)
+			if e == nil && r.Status == "pending" && r.RequestID != "" {
+				if checked, checkErr := s.Status(ctx, r.ID); checkErr == nil {
+					r = checked
+				}
+			}
 			return result{record: &r, err: e}
 		case "status":
 			r, e := s.Status(ctx, m.fields[0].Value())
@@ -240,9 +245,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if t, e := time.Parse(time.RFC3339Nano, r.Created); e == nil {
 					date = t.Local().Format("01-02 15:04")
 				}
-				rows = append(rows, table.Row{date, r.Recipient, r.Currency + " " + money.Format(r.Amount), r.Status, r.Environment})
+				rows = append(rows, table.Row{date, r.Recipient, r.Currency + " " + money.Format(r.Amount), transactionStatus(r)})
 			}
-			m.table = table.New(table.WithColumns([]table.Column{{Title: "Local date", Width: 11}, {Title: "Recipient", Width: 14}, {Title: "Amount", Width: 12}, {Title: "Status", Width: 9}, {Title: "Env", Width: 10}}), table.WithRows(rows), table.WithHeight(max(1, min(12, m.height-10))), table.WithFocused(true), table.WithWidth(max(1, m.width-8)))
+			m.table = table.New(table.WithColumns([]table.Column{{Title: "Local date", Width: 11}, {Title: "Recipient", Width: 14}, {Title: "Amount", Width: 12}, {Title: "Status", Width: 9}}), table.WithRows(rows), table.WithHeight(max(1, min(12, m.height-10))), table.WithFocused(true), table.WithWidth(max(1, m.width-8)))
 			styles := table.DefaultStyles()
 			styles.Header = styles.Header.Foreground(teal).Bold(true)
 			styles.Selected = styles.Selected.Foreground(teal).Background(lipgloss.AdaptiveColor{Light: "254", Dark: "236"}).Bold(true)
@@ -374,18 +379,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.spin, cmd = m.spin.Update(msg)
 	return m, cmd
 }
-func recordText(r storage.Record) string {
-	if r.Currency == "" {
-		return fmt.Sprintf("Provider ID: %s\nRecipient/amount: Not available\nEnvironment: %s\nDelivery: %s\nLast checked: %s\nMessage: %s", r.RequestID, r.Environment, r.Status, storage.LocalTime(r.Checked), r.Message)
+
+// transactionStatus separates a successful submission from confirmed delivery.
+func transactionStatus(r storage.Record) string {
+	switch r.Status {
+	case "delivered":
+		return "Success"
+	case "pending":
+		if r.Submission == "accepted" && strings.EqualFold(r.Message, "Sent") {
+			return "Sent"
+		}
+		return "Pending"
+	case "failed":
+		return "Failed"
+	default:
+		return "Unknown"
 	}
-	return fmt.Sprintf("Operation: %s\nProvider ID: %s\nRecipient: %s\nAmount: %s %s\nEnvironment: %s\nSubmission: %s\nDelivery: %s\nLast checked: %s\nMessage: %s", r.ID, r.RequestID, r.Recipient, r.Currency, money.Format(r.Amount), r.Environment, r.Submission, r.Status, storage.LocalTime(r.Checked), r.Message)
+}
+
+func recordText(r storage.Record) string {
+	status := transactionStatus(r)
+	if status == "Sent" {
+		status += " (accepted; delivery not yet confirmed)"
+	}
+	if r.Currency == "" {
+		return fmt.Sprintf("Provider ID: %s\nRecipient/amount: Not available\nStatus: %s\nLast checked: %s\nMessage: %s", r.RequestID, status, storage.LocalTime(r.Checked), r.Message)
+	}
+	return fmt.Sprintf("Operation: %s\nProvider ID: %s\nRecipient: %s\nAmount: %s %s\nSubmission: %s\nStatus: %s\nLast checked: %s\nMessage: %s", r.ID, r.RequestID, r.Recipient, r.Currency, money.Format(r.Amount), r.Submission, status, storage.LocalTime(r.Checked), r.Message)
 }
 func (m model) View() string {
 	if m.width > 0 && (m.width < 45 || m.height < 15) {
 		return "ATCLI — enlarge terminal to at least 45×15.\n80×24 recommended. q / Ctrl+C quits.\n"
 	}
-	title := headingStyle.Render("ATCLI — Africa's Talking") + "  •  " + environmentLabel(m.env)
-	body := "Account: " + m.username() + "\n\n"
+	title := headingStyle.Render("ATCLI — Africa's Talking")
+	if m.env == "sandbox" {
+		title += "  •  " + headingStyle.Render("SANDBOX")
+	}
+	body := ""
 	switch m.screen {
 	case "dashboard":
 		for i, item := range menu {
@@ -412,7 +442,7 @@ func (m model) View() string {
 			body += "\nChanging environment also requires its matching username and key.\nBlank API key keeps the stored key; AT_* variables take precedence."
 		}
 	case "confirm":
-		body = warningStyle.Render("CONFIRM "+strings.ToUpper(m.env)+" PURCHASE") + fmt.Sprintf("\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\nAccount: %s\n\nPress Enter to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount), m.preview.Account)
+		body = warningStyle.Render("CONFIRM PURCHASE") + fmt.Sprintf("\n\nRecipient: %s\nAmount: %s %s\nNetwork: Not verified\n\nPress Enter to purchase, n to edit, Esc to cancel.\nSent means accepted, not delivered.", m.preview.Recipient, m.preview.Currency, money.Format(m.preview.Amount))
 	case "history":
 		body += "Locally recorded purchases\n" + m.table.View() + "\n↑↓ Select  Enter Details  Esc Back"
 	case "result":

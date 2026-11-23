@@ -11,10 +11,3 @@ var (
 	warningStyle = lipgloss.NewStyle().Bold(true).Foreground(amber)
 	errorStyle   = lipgloss.NewStyle().Foreground(errorRed)
 )
-
-func environmentLabel(env string) string {
-	if env == "production" {
-		return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("214")).Padding(0, 1).Render("PRODUCTION")
-	}
-	return headingStyle.Render("SANDBOX")
-}
